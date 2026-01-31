@@ -6,22 +6,37 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "listener": "tsx backend/blockchain-listener.ts",
+    "server": "tsx backend/websocket-server.ts",
+    "client": "tsx backend/frontend-client.ts",
+    "dev:listener": "tsx watch backend/blockchain-listener.ts",
+    "dev:server": "tsx watch backend/websocket-server.ts",
+    "dev:client": "tsx watch backend/frontend-client.ts",
+    "backend:all": "concurrently \"npm run listener\" \"npm run server\"",
+    "dev:backend": "concurrently \"npm run dev:listener\" \"npm run dev:server\""
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
+    "ethers": "^6.16.0",
+    "ioredis": "^5.4.1",
+    "ws": "^8.18.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^22.10.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.5.13",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5.7.3",
+    "tsx": "^4.19.2",
+    "concurrently": "^9.1.2"
   },
   "ignoreScripts": [
     "sharp",
