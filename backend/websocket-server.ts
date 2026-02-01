@@ -1,6 +1,8 @@
 import WebSocket, { WebSocketServer as WSServer } from 'ws';
 import Redis from 'ioredis';
 import dotenv from 'dotenv';
+import express from 'express';
+import http from 'http';
 import {
   WebSocketMessage,
   CurrentAPYResponse,
@@ -48,10 +50,20 @@ class WebSocketServer {
   private redisSub: Redis;
   private clients: Map<WebSocket, ClientInfo> = new Map();
   private pingInterval: NodeJS.Timeout | null = null;
+  private app: express.Application;
+  private httpServer: http.Server;
 
   constructor(port: number) {
+    // Initialize Express app
+    this.app = express();
+    this.app.use(express.json());
+    
+    // Create HTTP server
+    this.httpServer = http.createServer(this.app);
+    
+    // Attach WebSocket server to HTTP server
     this.wss = new WSServer({ 
-      port,
+      server: this.httpServer,
       clientTracking: true
     });
 
@@ -86,6 +98,45 @@ class WebSocketServer {
     this.redisSub.on('error', (err) => {
       Logger.error('Redis (sub) error', { error: err.message });
     });
+
+    // Setup API routes
+    this.setupAPIRoutes();
+  }
+
+  private setupAPIRoutes(): void {
+    // API route to get latest APY data for all tokens
+    this.app.get('/api/fetchApy', async (req, res) => {
+      try {
+        const apyData: any = {};
+
+        for (const token of SUPPORTED_TOKENS) {
+          try {
+            const apyKey = REDIS_KEYS.APY(token);
+            const data = await this.redis.hgetall(apyKey);
+
+            if (data && data.supplyAPY) {
+              apyData[token] = {
+                supply: parseFloat(data.supplyAPY),
+                borrow: parseFloat(data.borrowAPY)
+              };
+            }
+          } catch (error: any) {
+            Logger.error(`Failed to get APY for ${token}`, { error: error.message });
+          }
+        }
+
+        res.json(apyData);
+        Logger.info('API: Sent latest APY data', { tokens: Object.keys(apyData).length });
+      } catch (error: any) {
+        Logger.error('API: Failed to get APY data', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch APY data' });
+      }
+    });
+
+    // Health check endpoint
+    this.app.get('/health', (req, res) => {
+      res.json({ status: 'ok', timestamp: Date.now() });
+    });
   }
 
   async initialize(): Promise<void> {
@@ -112,8 +163,13 @@ class WebSocketServer {
     // Start heartbeat
     this.startHeartbeat();
 
-    Logger.info('WebSocket server initialized', { 
-      port: (this.wss.address() as any)?.port || 'unknown'
+    // Start HTTP server
+    const port = (this.httpServer.address() as any)?.port || process.env.WS_PORT || 8080;
+    await new Promise<void>((resolve) => {
+      this.httpServer.listen(port, () => {
+        Logger.info('HTTP and WebSocket server initialized', { port });
+        resolve();
+      });
     });
   }
 
@@ -383,8 +439,8 @@ class WebSocketServer {
 
     // Close WebSocket server
     await new Promise<void>((resolve) => {
-      this.wss.close(() => {
-        Logger.info('WebSocket server closed');
+      this.httpServer.close(() => {
+        Logger.info('HTTP and WebSocket server closed');
         resolve();
       });
     });
