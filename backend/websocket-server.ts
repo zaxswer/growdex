@@ -164,10 +164,10 @@ class WebSocketServer {
     this.startHeartbeat();
 
     // Start HTTP server
-    const port = (this.httpServer.address() as any)?.port || process.env.WS_PORT || 8080;
+    const port = parseInt(process.env.WS_PORT || '8080');
     await new Promise<void>((resolve) => {
-      this.httpServer.listen(port, () => {
-        Logger.info('HTTP and WebSocket server initialized', { port });
+      this.httpServer.listen(port, '0.0.0.0', () => {
+        Logger.info('HTTP and WebSocket server initialized', { port, host: '0.0.0.0' });
         resolve();
       });
     });
